@@ -8,6 +8,7 @@ const { transformData } = require("./services/transform-data");
 const { exportToExcel } = require("./services/excel");
 const { setTypes } = require("./utils/get-week-types");
 const { uploadToGoogleDrive } = require("./services/google-drive");
+const { log, logEmitter } = require("./services/log-stream");
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -15,11 +16,29 @@ const port = process.env.PORT || 3000;
 app.use(express.static(path.join(__dirname, "public")));
 app.use(express.json());
 
+app.get('/events', (req, res) => {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders(); // Flush the headers to establish the connection
+
+    const sendLog = (message) => {
+        res.write(`data: ${message}\n\n`);
+    };
+
+    logEmitter.on('log', sendLog);
+
+    // Clean up when the client closes the connection
+    req.on('close', () => {
+        logEmitter.removeListener('log', sendLog);
+    });
+});
+
 app.post("/process-sheets", async (req, res) => {
     try {
         const auth = await getGoogleAuth();
         const sheetsClient = google.sheets({ version: "v4", auth });
-        console.log("Connected to Google API.");
+        log("Connected to Google API.");
 
         const year = parseInt(process.env.DATASET_YEAR);
         const month = parseInt(process.env.DATASET_MONTH);
@@ -32,7 +51,7 @@ app.post("/process-sheets", async (req, res) => {
             process.env.PROJECT_SPREADSHEET,
             process.env.PROJECT_RANGE
         );
-        console.log("Timesheet collection started...");
+        log("Timesheet collection started...");
 
         let allTransformedData = [];
 
@@ -44,7 +63,7 @@ app.post("/process-sheets", async (req, res) => {
             );
 
             if (!employeeData || employeeData.length === 0) {
-                console.error(`No employee data collected for ${sheetName}`);
+                log(`⚠️ No employee data collected for ${sheetName}`);
                 continue;
             }
 
@@ -59,7 +78,7 @@ app.post("/process-sheets", async (req, res) => {
                     team: employee[3]
                 }));
 
-            console.log(`Collecting timesheet [${sheetName}] data...`);
+            log(`Extracting timesheet [${sheetName}] data...\n`);
 
             for (const employee of employees) {
                 const data = await getData(
@@ -69,20 +88,26 @@ app.post("/process-sheets", async (req, res) => {
                 );
                 const transformedData = transformData(datasets, data, employee, projectData);
                 allTransformedData = allTransformedData.concat(transformedData);
-                console.log(`✅ [${sheetName}]-[${employee.nickname}] data processed.`);
+                log(`✅ [${sheetName}]-[${employee.nickname}] data processed.`);
             }
+            log(`All data for sheet ${sheetName} processed.`);
         }
 
+        // *** BUG FIX ***: The response should only be sent ONCE, after all loops are finished.
         if (allTransformedData.length > 0) {
-            const excelFilePath = await exportToExcel(allTransformedData, "TimeCollect_2025");
+            log("Generating Excel file...\n");
+            const excelFilePath = await exportToExcel(allTransformedData, "TimeCollect");
+            log("Uploading file to Google Drive...\n");
             await uploadToGoogleDrive(auth, excelFilePath);
-            res.status(200).send("Sheets processed and data uploaded to Google Drive.");
+            log("🚀 Success! Process complete.");
+            res.status(200).send("Processing complete. File uploaded to Google Drive.");
         } else {
-            res.status(200).send("No data found to process.");
+            log("No data found to process.");
+            res.status(200).send("No data found to process.\n");
         }
     } catch (error) {
         console.error("Error processing sheets:", error);
-        res.status(500).send("An error occurred while processing the sheets.");
+        res.status(500).send(`An error occurred while processing the sheets.\n${error.message}`);
     }
 });
 

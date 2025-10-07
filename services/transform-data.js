@@ -2,6 +2,14 @@ const { deleteColumns } = require("../utils/clean-data");
 const { getName } = require("../utils/get-week-types");
 const { getClient } = require("../utils/project-helper");
 
+/**
+ * Transforms raw data from a Google Sheet into a structured format.
+ * @param {Array} dataset - The week type datasets.
+ * @param {Array<Array<string>>} dataList - The raw data from the sheet.
+ * @param {object} employee - The employee object.
+ * @param {Array} project - The project data.
+ * @returns {Array<Array<any>>} - The transformed data.
+ */
 function transformData(dataset, dataList, employee, project) {
     let transformedData = [];
 
@@ -55,4 +63,4 @@ function transformData(dataset, dataList, employee, project) {
     return transformedData;
 }
 
-module.export = { transformData };
+module.exports = { transformData };
