@@ -16,7 +16,7 @@ async function getGoogleAuth() {
             key: keys.private_key,
             scopes: [
                 'https://www.googleapis.com/auth/spreadsheets',
-                'https://www.googleapis.com/auth/drive',
+                'https://www.googleapis.com/auth/drive.file',
             ]
         });
         return client;
