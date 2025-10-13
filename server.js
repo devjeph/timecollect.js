@@ -5,9 +5,8 @@ const { google } = require("googleapis");
 const { getGoogleAuth } = require("./config/google");
 const { getData } = require("./services/data-collection");
 const { transformData } = require("./services/transform-data");
-const { exportToExcel } = require("./services/excel");
 const { setTypes } = require("./utils/get-week-types");
-const { uploadToGoogleDrive } = require("./services/google-drive");
+const { createOrUpdateSheet } = require("./services/google-sheets-service");
 const { log, logEmitter } = require("./services/log-stream");
 
 const app = express();
@@ -95,12 +94,10 @@ app.post("/process-sheets", async (req, res) => {
 
         // *** BUG FIX ***: The response should only be sent ONCE, after all loops are finished.
         if (allTransformedData.length > 0) {
-            log("Generating Excel file...\n");
-            const excelFilePath = await exportToExcel(allTransformedData, "TimeCollect");
-            log("Uploading file to Google Drive...\n");
-            await uploadToGoogleDrive(auth, excelFilePath);
-            log("🚀 Success! Process complete.");
-            res.status(200).send("Processing complete. File uploaded to Google Drive.");
+            log("Creating or updating Google Sheet...");
+            // *** REVISED LOGIC ***
+            await createOrUpdateSheet(auth, allTransformedData);
+            res.status(200).send("Processing complete. Google Sheet created/updated.");
         } else {
             log("No data found to process.");
             res.status(200).send("No data found to process.\n");

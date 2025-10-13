@@ -21,7 +21,6 @@
   "homepage": "https://github.com/devjeph/timecollect.js#readme",
   "dependencies": {
     "dotenv": "^17.2.3",
-    "exceljs": "^4.4.0",
     "express": "^5.1.0",
     "googleapis": "^161.0.0"
   },
