@@ -1,15 +1,9 @@
-async function getData(sheets, spreadsheetId, range) {
-    try {
-        const response = await sheets.spreadsheets.values.get({
-            spreadsheetId,
-            range,
-        });
-        return response.data.values || [];
+const googleSheets = require('./google-sheets-service');
+const transformData = require('./transform-data');
 
-    } catch (error) {
-        console.error(`An error occurred while fetching from ${spreadsheetId} with range ${range}:, ${error}`);
-        return [];
-    }
+async function collect(entry) {
+    const transformedEntry = transformData.transformData(entry);
+    await googleSheets.save(transformedEntry);
 }
 
-module.exports = { getData };
+module.exports = { collect };

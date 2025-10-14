@@ -1,82 +1,52 @@
 require("dotenv").config();
 const { google } = require("googleapis");
+const { authorize } = require('../config/google');
 
-/**
- * Creates or updates a Google Sheet with the provided data.
- * @param {object} creds - The Google OAuth Credentials.
- * @param {Array<Array<any>>} data - The transformed data to write to the sheet.
- */
-async function createOrUpdateSheet(creds, data) {
-    const drive = google.drive({ version: "v3", auth: creds });
-    const sheets = google.sheets({ version: "v4", auth: creds });
-    const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID;
-    const spreadsheetName = process.env.OUTPUT_GOOGLE_SPREADSHEET_NAME;
+const sheets = google.sheets('v4');
 
-    if (!folderId || !spreadsheetName ) {
-        throw new Error("Missing environment variables. Check your .env file");
+async function getSheet(auth, spreadsheetId) {
+    try {
+        const request = { spreadsheetId, auth };
+        const response = await sheets.spreadsheets.get(request);
+        return response.data;
+    } catch (error) {
+        if (error.code === 404) {
+            return null;
+        }
+        throw error;
+    }
+}
+
+async function createSheet(auth, title) {
+    const request = {
+        resource: {
+            properties: { title },
+        },
+        auth,
+    };
+    const response = await sheets.spreadsheets.create(request);
+    return response.data;
+}
+
+async function save(entry) {
+    const auth = await authorize();
+    
+    if (!spreadsheetId) {
+        spreadsheetId = await createSheet(auth);
+        console.log(`Created new spreadsheet with ID: ${spreadsheetId}`);
     }
 
-    let spreadsheetId;
-
-    // Search for an existing spreadsheet with the same name in the folder.
-    console.log(`Searching for existing spreadsheet named: "${spreadsheetName}"`);
-    const searchResponse = await drive.files.list({
-        q: `name='${spreadsheetName}' and '${folderId}' in parents and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false`,
-        fields: 'files(id)',
-        spaces: 'drive'
-    });
-
-    if (searchResponse.data.files.length > 0) {
-        // Spreadsheet exists
-        spreadsheetId = searchResponse.data.files[0].id;
-        console.log(`Found existing spreadsheet with ID: ${spreadsheetId}`);
-
-        console.log("Clearing existing data from the sheet...");
-        await sheets.spreadsheets.values.clear({
-            spreadsheetId,
-            range: 'Sheet1'
-        });
-    } else {
-        // Spreadsheet does not exist
-        console.log("No existing spreadsheet found. Creating a new one...");
-
-        const createResponse = await sheets.spreadsheets.create({
-            resource: {
-                properties: {
-                    title: spreadsheetName
-                },
-            },
-            fields: 'spreadsheetId'
-        });
-        spreadsheetId = createResponse.data.spreadsheetId;
-
-        // Move the newly created file to the correct folder
-        await drive.files.update({
-            fileId: spreadsheetId,
-            addParents: folderId,
-            removeParents: 'root',
-            fields: 'id, parents'
-        });
-        console.log(`Successfully created and moved new spreadsheet with ID: ${spreadsheetId}`);
-    }
-
-    // Write the new data to the spreadseet.
-    console.log("Writing new data to the spreadsheet...");
-    const headers = [
-        "対応", "行番号", "年", "月", "日", "WeekType", "名前", "工号", "種別", "直接/間接", "原寸/3D/管理", "時間"
-    ];
-
-    await sheets.spreadsheets.values.update({
-        spreadsheetId,
+    const request = {
+        spreadsheetId: spreadsheetId,
         range: 'Sheet1!A1',
         valueInputOption: 'USER_ENTERED',
         resource: {
-            values: [headers, ...data],
+            values: [entry],
         },
-    });
+        auth,
+    };
 
-    console.log("🚀 Success! Google Sheet has been updated with the latest data.");
-    return spreadsheetId;
+    await sheets.spreadsheets.values.append(request);
 }
 
-module.exports = { createOrUpdateSheet };
+module.exports = { save };

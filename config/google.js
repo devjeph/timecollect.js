@@ -3,7 +3,6 @@ const path = require('path');
 const process = require('process');
 const { authenticate } = require('@google-cloud/local-auth');
 const { google } = require('googleapis');
-const { auth } = require('googleapis/build/src/apis/abusiveexperiencereport');
 
 const SCOPES = [
     'https://www.googleapis.com/auth/spreadsheets',

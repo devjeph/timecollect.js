@@ -1,6 +1,7 @@
 require("dotenv").config();
 const path = require("path");
 const express = require("express");
+const { GoogleAuth } = require("google-auth-library");
 const { google } = require("googleapis");
 const { getGoogleCredentials } = require("./config/google");
 const { getData } = require("./services/data-collection");
