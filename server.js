@@ -2,7 +2,7 @@ require("dotenv").config();
 const path = require("path");
 const express = require("express");
 const { google } = require("googleapis");
-const { getGoogleAuth } = require("./config/google");
+const { getGoogleCredentials } = require("./config/google");
 const { getData } = require("./services/data-collection");
 const { transformData } = require("./services/transform-data");
 const { setTypes } = require("./utils/get-week-types");
@@ -10,7 +10,7 @@ const { createOrUpdateSheet } = require("./services/google-sheets-service");
 const { log, logEmitter } = require("./services/log-stream");
 
 const app = express();
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || 5000;
 
 app.use(express.static(path.join(__dirname, "public")));
 app.use(express.json());
@@ -35,8 +35,8 @@ app.get('/events', (req, res) => {
 
 app.post("/process-sheets", async (req, res) => {
     try {
-        const auth = await getGoogleAuth();
-        const sheetsClient = google.sheets({ version: "v4", auth });
+        const creds = await getGoogleCredentials();
+        const sheetsClient = google.sheets({ version: "v4", creds });
         log("Connected to Google API.");
 
         const year = parseInt(process.env.DATASET_YEAR);
@@ -96,7 +96,7 @@ app.post("/process-sheets", async (req, res) => {
         if (allTransformedData.length > 0) {
             log("Creating or updating Google Sheet...");
             // *** REVISED LOGIC ***
-            await createOrUpdateSheet(auth, allTransformedData);
+            await createOrUpdateSheet(creds, allTransformedData);
             res.status(200).send("Processing complete. Google Sheet created/updated.");
         } else {
             log("No data found to process.");

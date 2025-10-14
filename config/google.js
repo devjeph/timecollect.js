@@ -1,30 +1,56 @@
-const { JWT } = require('google-auth-library');
 const fs = require('fs').promises;
 const path = require('path');
+const process = require('process');
+const { authenticate } = require('@google-cloud/local-auth');
+const { google } = require('googleapis');
+const { auth } = require('googleapis/build/src/apis/abusiveexperiencereport');
 
-async function getGoogleAuth() {
-    const keyFilePath = path.join(__dirname, '..', 'google_credentials', 'serviceToken.json');
+const SCOPES = [
+    'https://www.googleapis.com/auth/spreadsheets',
+    'https://www.googleapis.com/auth/drive',
+    'https://www.googleapis.com/auth/drive.file',
+]
 
+const CREDENTIALS_PATH = path.join(process.cwd(), 'google_credentials', 'credentials.json');
+const TOKEN_PATH = path.join(process.cwd(), 'google_credentials', 'token.json');
+
+async function loadSavedCredentialsIfExist() {
     try {
-        // Read the service account credentials from the JSON file
-        const credentialsContent = await fs.readFile(keyFilePath, 'utf8');
-        const keys = JSON.parse(credentialsContent);
-
-        // Use the credentials option instead of 'keyFile'
-        const client = new JWT({
-            email: keys.client_email,
-            key: keys.private_key,
-            scopes: [
-                'https://www.googleapis.com/auth/spreadsheets',
-                'https://www.googleapis.com/auth/drive.file',
-            ]
-        });
-        return client;
+        const content = await fs.readFile(TOKEN_PATH);
+        const credentials = JSON.parse(content);
+        return google.auth.fromJSON(credentials);
     } catch (error) {
-        console.error("FATAL ERROR: Failed to load Google service account credentials:", error);
-        console.error("Please ensure the credentials file exists and is valid.");
-        throw error;
+        return null;
     }
 }
 
-module.exports = { getGoogleAuth };
+async function saveCredentials(client) {
+    const content = await fs.readFile(CREDENTIALS_PATH);
+    const keys = JSON.parse(content);
+    const key = keys.installed || keys.web;
+    const payload = JSON.stringify({
+        type: 'authorized_user',
+        client_id: key.client_id,
+        client_secret: key.client_secret,
+        refresh_token: client.credentials.refresh_token,
+    });
+    await fs.writeFile(TOKEN_PATH, payload);
+}
+
+async function authorize() {
+    let client = await loadSavedCredentialsIfExist();
+    if (client) {
+        return client;
+    }
+    client = await authenticate({
+        scopes: SCOPES,
+        keyfilePath: CREDENTIALS_PATH,
+    });
+    if (client.credentials) {
+        await saveCredentials(client);
+    }
+    return client;
+}
+
+
+module.exports = { authorize };

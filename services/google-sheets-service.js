@@ -3,12 +3,12 @@ const { google } = require("googleapis");
 
 /**
  * Creates or updates a Google Sheet with the provided data.
- * @param {object} auth - The authenticated Google JWT client.
+ * @param {object} creds - The Google OAuth Credentials.
  * @param {Array<Array<any>>} data - The transformed data to write to the sheet.
  */
-async function createOrUpdateSheet(auth, data) {
-    const drive = google.drive({ version: "v3", auth });
-    const sheets = google.sheets({ version: "v4", auth });
+async function createOrUpdateSheet(creds, data) {
+    const drive = google.drive({ version: "v3", auth: creds });
+    const sheets = google.sheets({ version: "v4", auth: creds });
     const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID;
     const spreadsheetName = process.env.OUTPUT_GOOGLE_SPREADSHEET_NAME;
 
